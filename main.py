@@ -7199,22 +7199,36 @@ async def shutdown_app(signal_type=None):
             logger.warning("Uygulama durdurma hatası: %s", e)
     logger.info("Bot durdu.")
 
-
 def main() -> None:
+    global app
     try:
         validate_config()
         load_memory()
-        global app
         app = build_app()
-        loop = asyncio.get_event_loop()
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        except Exception:
+            loop = asyncio.get_event_loop_policy().new_event_loop()
+            asyncio.set_event_loop(loop)
+
         for sig in (signal.SIGTERM, signal.SIGINT):
             try:
                 if hasattr(loop, "add_signal_handler"):
-                    loop.add_signal_handler(sig, lambda s=sig: asyncio.create_task(shutdown_app(s.name)))
+                    loop.add_signal_handler(
+                        sig,
+                        lambda s=sig: asyncio.create_task(shutdown_app(s.name))
+                    )
             except (NotImplementedError, RuntimeError, ValueError):
-                logger.info("Bu platformda add_signal_handler desteklenmiyor: %s", getattr(sig, "name", sig))
+                logger.info(
+                    "Bu platformda add_signal_handler desteklenmiyor: %s",
+                    getattr(sig, "name", sig)
+                )
+
         logger.info("%s başlıyor", VERSION_NAME)
         app.run_polling(close_loop=False, drop_pending_updates=True)
+
     except KeyboardInterrupt:
         logger.info("Kullanıcı tarafından durduruldu.")
     except Exception as e:
